@@ -1,0 +1,220 @@
+---
+title: "HospitalReadmissionCode"
+output: html_document
+date: "2025-04-10"
+---
+
+Import Code and Edit Labels
+```{r}
+# Load libraries
+library(tidyverse)
+
+# Load data
+df <- read.csv("diabetic.data.final.csv", stringsAsFactors = FALSE)
+
+# Quick peek
+str(df)
+summary(df)
+
+### As Factor ###
+df$gender <- as.factor(df$gender)
+df$race <- as.factor(df$race)
+df$age3 <- as.factor(df$age3)
+df$admission.source <- as.factor(df$admission.source)
+df$discharge_disposition <- as.factor(df$discharge_disposition)
+df$prim.diag <- as.factor(df$prim.diag)
+df$admit.spec <- as.factor(df$admit.spec)
+df$HbA1c <- as.factor(df$HbA1c)
+df$early.readmit <- as.factor(df$early.readmit)
+
+
+#### HbA1c ####
+table(df$HbA1c)
+prop.table(table(df$HbA1c))
+
+table(df$HbA1c, df$early.readmit)
+prop.table(table(df$HbA1c, df$early.readmit), margin = 1)
+
+chisq.test(table(df$HbA1c, df$early.readmit))
+
+
+#### Control Variables ####
+#Gender
+table(df$gender, df$early.readmit)
+chisq.test(table(df$gender, df$early.readmit))
+
+# Race
+table(df$race, df$early.readmit)
+chisq.test(table(df$race, df$early.readmit))
+
+# Age
+table(df$age3, df$early.readmit)
+chisq.test(table(df$age3, df$early.readmit))
+
+# Admission Source
+table(df$admission.source, df$early.readmit)
+chisq.test(table(df$admission.source, df$early.readmit))
+
+# Discharge Dispo
+table(df$discharge_disposition, df$early.readmit)
+chisq.test(table(df$discharge_disposition, df$early.readmit))
+
+# Primary Diagnosis
+table(df$prim.diag, df$early.readmit)
+chisq.test(table(df$prim.diag, df$early.readmit))
+
+# Medical Specialty
+table(df$admit.spec, df$early.readmit)
+chisq.test(table(df$admit.spec, df$early.readmit))
+
+# Time in Hospital
+tapply(df$time_in_hospital, df$early.readmit, summary)
+t.test(time_in_hospital ~ early.readmit, data = df)
+
+
+```
+
+Base Model
+```{r}
+# 1. Base model WITHOUT HbA1c
+base_model <- glm(
+  early.readmit ~ age3 + admission.source + discharge_disposition +
+    prim.diag + admit.spec + time_in_hospital,
+  data = df_model,
+  family = binomial
+)
+
+# 2. View the summary of the base model
+summary(base_model)
+
+# 3. Now fit the full model WITH HbA1c added back
+hbA1c_model <- glm(
+  early.readmit ~ HbA1c + age3 + admission.source + discharge_disposition +
+    prim.diag + admit.spec + time_in_hospital,
+  data = df_model,
+  family = binomial
+)
+
+# 4. View the summary with HbA1c
+summary(hbA1c_model)
+
+# 5. Perform a likelihood ratio test to see if adding HbA1c improves model fit
+anova(base_model, hbA1c_model, test = "LRT")
+
+# 6. Get odds ratios and confidence intervals
+exp(cbind(OddsRatio = coef(hbA1c_model), confint(hbA1c_model)))
+```
+
+Testing Pairwise Interactions
+```{r}
+# 1. age3 × prim.diag
+interact1 <- glm(early.readmit ~ age3 * prim.diag + admission.source +
+                   discharge_disposition + admit.spec + time_in_hospital,
+                 data = df_model, family = binomial)
+anova(base_model, interact1, test = "LRT")
+
+# 2. admission.source × discharge_disposition
+interact2 <- glm(early.readmit ~ age3 + admission.source * discharge_disposition +
+                   prim.diag + admit.spec + time_in_hospital,
+                 data = df_model, family = binomial)
+anova(base_model, interact2, test = "LRT")
+
+# 3. admit.spec × discharge_disposition
+interact3 <- glm(early.readmit ~ age3 + admission.source + discharge_disposition *
+                   admit.spec + prim.diag + time_in_hospital,
+                 data = df_model, family = binomial)
+anova(base_model, interact3, test = "LRT")
+
+# 4. age3 × time_in_hospital
+interact4 <- glm(early.readmit ~ age3 * time_in_hospital + admission.source +
+                   discharge_disposition + prim.diag + admit.spec,
+                 data = df_model, family = binomial)
+anova(base_model, interact4, test = "LRT")
+
+# 5. prim.diag × admit.spec
+interact5 <- glm(early.readmit ~ age3 + admission.source + discharge_disposition +
+                   prim.diag * admit.spec + time_in_hospital,
+                 data = df_model, family = binomial)
+anova(base_model, interact5, test = "LRT")
+
+
+# Example: age3 × prim.diag
+interact_model1 <- glm(
+  early.readmit ~ age3 * prim.diag + admission.source + discharge_disposition +
+    admit.spec + time_in_hospital,
+  data = df_model,
+  family = binomial
+)
+
+# Compare to base model
+anova(base_model, interact_model1, test = "LRT")
+```
+
+Interpretation of Pairwise Interactions - Did any improve the model?
+```{r}
+# 1. HbA1c × age3
+hbA1c_inter1 <- glm(early.readmit ~ HbA1c * age3 + admission.source +
+                      discharge_disposition + prim.diag + admit.spec + 
+                      time_in_hospital,
+                    data = df_model, family = binomial)
+anova(hbA1c_model, hbA1c_inter1, test = "LRT")
+
+# 2. HbA1c × prim.diag
+hbA1c_inter2 <- glm(early.readmit ~ HbA1c * prim.diag + age3 + admission.source +
+                      discharge_disposition + admit.spec + time_in_hospital,
+                    data = df_model, family = binomial)
+anova(hbA1c_model, hbA1c_inter2, test = "LRT")
+
+# 3. HbA1c × discharge_disposition
+hbA1c_inter3 <- glm(early.readmit ~ HbA1c * discharge_disposition + age3 + 
+                      admission.source + prim.diag + admit.spec + time_in_hospital,
+                    data = df_model, family = binomial)
+anova(hbA1c_model, hbA1c_inter3, test = "LRT")
+
+# 4. HbA1c × admit.spec
+hbA1c_inter4 <- glm(early.readmit ~ HbA1c * admit.spec + age3 + admission.source +
+                      discharge_disposition + prim.diag + time_in_hospital,
+                    data = df_model, family = binomial)
+anova(hbA1c_model, hbA1c_inter4, test = "LRT")
+
+# 5. HbA1c × time_in_hospital
+hbA1c_inter5 <- glm(early.readmit ~ HbA1c * time_in_hospital + age3 + admission.source +
+                      discharge_disposition + prim.diag + admit.spec,
+                    data = df_model, family = binomial)
+anova(hbA1c_model, hbA1c_inter5, test = "LRT")
+```
+
+Final Model
+```{r}
+## Final Model ##
+final_model <- glm(
+  early.readmit ~ HbA1c * prim.diag + 
+    HbA1c * admit.spec + 
+    admit.spec * discharge_disposition + 
+    prim.diag * admit.spec + 
+    age3 + admission.source + time_in_hospital,
+  data = df_model,
+  family = binomial
+)
+
+summary(final_model)
+
+library(pROC)
+
+# 1. Create the ROC object
+roc_obj <- roc(df_model$early.readmit, pred_probs)
+
+# 2. Find optimal threshold using Youden's J
+optimal_coords <- coords(roc_obj, x = "best", best.method = "youden", ret = c("threshold", "sensitivity", "specificity"), transpose = FALSE)
+optimal_threshold <- optimal_coords$threshold
+optimal_sens <- optimal_coords$sensitivity
+optimal_spec <- optimal_coords$specificity
+
+# 3. Plot the ROC curve
+plot(roc_obj, col = "blue", main = "ROC Curve with Optimal Threshold", print.auc = TRUE)
+
+# 4. Add point for optimal threshold
+points(1 - optimal_spec, optimal_sens, col = "red", pch = 19)
+text(1 - optimal_spec + 0.05, optimal_sens, labels = paste0("Threshold = ", round(optimal_threshold, 3)), col = "red")
+```
+
