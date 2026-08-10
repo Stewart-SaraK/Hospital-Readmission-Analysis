@@ -62,7 +62,7 @@ Model performance was assessed using receiver operating characteristic (ROC) ana
 
 ## Model Performance
 
-![ROC Curve](images/ROCCurve.png)
+![ROC Curve](images/ROCCurve)
 
 The ROC curve illustrates the model's ability to distinguish between patients who experienced early readmission and those who did not. The model achieved an AUC of approximately 0.62, suggesting modest predictive performance and highlighting opportunities for additional variables or alternative modeling approaches to improve risk discrimination.
 
